@@ -115,13 +115,17 @@ public class TownyProvincesDataHolder {
 	}
 
 
-	public void deleteProvince(Province province, Map<TPCoord,TPCoord> unclaimedCoordsMap) {
+	public void deleteProvince(Province province, Map<TPCoord, TPCoord> unclaimedCoordsMap) {
 		List<TPCoord> coordsInProvince = province.getListOfCoordsInProvince();
-		for(TPCoord coord: coordsInProvince) {
+		TownyProvinces.info("Deleting province: " + province.getId() + " with " + coordsInProvince.size() + " coordinates.");
+
+		for (TPCoord coord : coordsInProvince) {
 			coordProvinceMap.remove(coord);
-			unclaimedCoordsMap.put(coord,coord);
+			unclaimedCoordsMap.put(coord, coord);
 		}
+
 		provincesSet.remove(province);
+		TownyProvinces.info("Province " + province.getId() + " deleted.");
 	}
 
 	public Set<TPCoord> findAdjacentBorderCoords(TPCoord targetCoord) {

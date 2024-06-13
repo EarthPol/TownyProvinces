@@ -3,6 +3,7 @@ package io.github.townyadvanced.townyprovinces.jobs.province_generation;
 import com.palmergames.bukkit.towny.object.Coord;
 import io.github.townyadvanced.townyprovinces.TownyProvinces;
 import io.github.townyadvanced.townyprovinces.data.TownyProvincesDataHolder;
+import io.github.townyadvanced.townyprovinces.messaging.Messaging;
 import io.github.townyadvanced.townyprovinces.objects.Province;
 import io.github.townyadvanced.townyprovinces.objects.ProvinceClaimBrush;
 import io.github.townyadvanced.townyprovinces.objects.Region;
@@ -11,6 +12,7 @@ import io.github.townyadvanced.townyprovinces.objects.TPFinalCoord;
 import io.github.townyadvanced.townyprovinces.objects.TPFreeCoord;
 import io.github.townyadvanced.townyprovinces.settings.TownyProvincesSettings;
 import io.github.townyadvanced.townyprovinces.util.TownyProvincesMathUtil;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 
 import javax.annotation.Nullable;
@@ -445,19 +447,39 @@ public class PaintRegionAction {
 	}
 
 
-	private  boolean deleteEmptyProvinces() {
+	private boolean deleteEmptyProvinces() {
 		TownyProvinces.info("Now Deleting Empty Provinces.");
 		Set<Province> provincesToDelete = new HashSet<>();
-		for(Province province: TownyProvincesDataHolder.getInstance().getProvincesSet()) {
-			if(province.getListOfCoordsInProvince().size() == 0) {
-				provincesToDelete.add(province);
+
+		try {
+			Set<Province> provincesSet = TownyProvincesDataHolder.getInstance().getProvincesSet();
+			TownyProvinces.info("Total number of provinces: " + provincesSet.size());
+
+			for (Province province : provincesSet) {
+				TownyProvinces.info("Checking province: " + province.getId());
+				if (province.getListOfCoordsInProvince().isEmpty()) {
+					provincesToDelete.add(province);
+					TownyProvinces.info("Marked for deletion: " + province.getId());
+				}
 			}
+
+			TownyProvinces.info("Number of Provinces to delete: " + provincesToDelete.size());
+
+			for (Province province : provincesToDelete) {
+				try {
+					TownyProvinces.info("Attempting to delete Province: " + province.getId());
+					TownyProvincesDataHolder.getInstance().deleteProvince(province, unclaimedCoordsMap);
+					TownyProvinces.info("Province Deleted: " + province.getId());
+				} catch (Exception e) {
+					TownyProvinces.severe("Error deleting Province: " + province.getId() + e);
+				}
+			}
+
+			TownyProvinces.info("Empty Provinces Deleted.");
+		} catch (Exception e) {
+			TownyProvinces.severe("Error while deleting empty provinces" + e);
 		}
-		for(Province province: provincesToDelete) {
-			TownyProvincesDataHolder.getInstance().deleteProvince(province, unclaimedCoordsMap);
-			TownyProvinces.info("Province Deleted: " + province.getId());
-		}
-		TownyProvinces.info("Empty Provinces Deleted.");
+
 		return true;
 	}
 	

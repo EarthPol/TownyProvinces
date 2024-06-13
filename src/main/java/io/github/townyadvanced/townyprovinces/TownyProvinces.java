@@ -15,6 +15,7 @@ import io.github.townyadvanced.townyprovinces.messaging.Messaging;
 import io.github.townyadvanced.townyprovinces.settings.Settings;
 import io.github.townyadvanced.townyprovinces.settings.TownyProvincesSettings;
 import io.github.townyadvanced.townyprovinces.util.FileUtil;
+import libs.org.jboss.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
@@ -258,7 +259,7 @@ public class TownyProvinces extends JavaPlugin {
 	public static void info(String message) {
 		plugin.getLogger().info(message);
 	}
-
+	
 	public static void severe(String message) {
 		plugin.getLogger().severe(message);
 	}

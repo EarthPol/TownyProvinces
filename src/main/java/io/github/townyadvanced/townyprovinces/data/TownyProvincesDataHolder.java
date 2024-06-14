@@ -59,13 +59,18 @@ public class TownyProvincesDataHolder {
 	 * needs to be created to do a search of the map
 	 */
 	private final TPFreeCoord searchCoord;
-	
+
+	private final Map<Province, List<TPCoord>> coordsInProvinceMap;
+
+
 	private TownyProvincesDataHolder() {
-		searchCoord = new TPFreeCoord(0,0);
+		searchCoord = new TPFreeCoord(0, 0);
 		provincesSet = new HashSet<>();
 		coordProvinceMap = new HashMap<>();
+		coordsInProvinceMap = new HashMap<>();
 	}
-	
+
+
 	public static TownyProvincesDataHolder getInstance() {
 		return dataHolder;
 	}
@@ -76,22 +81,19 @@ public class TownyProvincesDataHolder {
 	}
 
 	public List<TPCoord> getListOfCoordsInProvince(Province province) {
-		List<TPCoord> result = new ArrayList<>();
-		for(Map.Entry<TPCoord,Province> mapEntry: coordProvinceMap.entrySet()) {
-			if(mapEntry.getValue().equals(province)) {
-				result.add(mapEntry.getKey());
-			}
-		}
-		return result;
+		return coordsInProvinceMap.getOrDefault(province, new ArrayList<>());
 	}
-	
+
+
 	public void addProvince(Province province) {
 		provincesSet.add(province);
 	}
-	
+
 	public void claimCoordForProvince(TPCoord coord, Province province) {
 		coordProvinceMap.put(coord, province);
+		coordsInProvinceMap.computeIfAbsent(province, k -> new ArrayList<>()).add(coord);
 	}
+
 
 	public Map<TPCoord, Province> getCoordProvinceMap() {
 		return coordProvinceMap;
@@ -116,15 +118,16 @@ public class TownyProvincesDataHolder {
 
 
 	public void deleteProvince(Province province, Map<TPCoord, TPCoord> unclaimedCoordsMap) {
-		List<TPCoord> coordsInProvince = province.getListOfCoordsInProvince();
+		List<TPCoord> coordsInProvince = coordsInProvinceMap.get(province);
 		TownyProvinces.info("Deleting province: " + province.getId() + " with " + coordsInProvince.size() + " coordinates.");
-
-		for (TPCoord coord : coordsInProvince) {
-			coordProvinceMap.remove(coord);
-			unclaimedCoordsMap.put(coord, coord);
+		if (coordsInProvince != null) {
+			for (TPCoord coord : coordsInProvince) {
+				coordProvinceMap.remove(coord);
+				unclaimedCoordsMap.put(coord, coord);
+			}
 		}
-
 		provincesSet.remove(province);
+		coordsInProvinceMap.remove(province);
 		TownyProvinces.info("Province " + province.getId() + " deleted.");
 	}
 

@@ -29,22 +29,21 @@ import java.util.Set;
 public class PaintRegionAction {
 	private final Region region;
 	private final Map<TPCoord, TPCoord> unclaimedCoordsMap;
-	
 	private final int mapMinXCoord;
 	private final int mapMaxXCoord;
 	private final int mapMinZCoord;
 	private final int mapMaxZCoord;
 	public final static double CHUNK_AREA_IN_SQUARE_METRES = Math.pow(TownyProvincesSettings.getChunkSideLength(), 2);
 	public final TPFreeCoord searchCoord;
-	
-	public PaintRegionAction(Region region, Map<TPCoord,TPCoord> unclaimedCoordsMap) {
+
+	public PaintRegionAction(Region region, Map<TPCoord, TPCoord> unclaimedCoordsMap) {
 		this.region = region;
 		this.unclaimedCoordsMap = unclaimedCoordsMap;
 		this.mapMinXCoord = TownyProvincesSettings.getFirstRegion().getTopLeftRegionCorner().getBlockX() / TownyProvincesSettings.getChunkSideLength();
 		this.mapMaxXCoord = TownyProvincesSettings.getFirstRegion().getBottomRightRegionCorner().getBlockX() / TownyProvincesSettings.getChunkSideLength();
 		this.mapMinZCoord = TownyProvincesSettings.getFirstRegion().getTopLeftRegionCorner().getBlockZ() / TownyProvincesSettings.getChunkSideLength();
 		this.mapMaxZCoord = TownyProvincesSettings.getFirstRegion().getBottomRightRegionCorner().getBlockZ() / TownyProvincesSettings.getChunkSideLength();
-		this.searchCoord = new TPFreeCoord(0,0);
+		this.searchCoord = new TPFreeCoord(0, 0);
 	}
 	
 	boolean executeAction(boolean deleteExistingProvincesInRegion) {
@@ -93,18 +92,21 @@ public class PaintRegionAction {
 		int maxX = region.getBottomRightRegionCorner().getBlockX() / TownyProvincesSettings.getChunkSideLength();
 		int minZ = region.getTopLeftRegionCorner().getBlockZ() / TownyProvincesSettings.getChunkSideLength();
 		int maxZ = region.getBottomRightRegionCorner().getBlockZ() / TownyProvincesSettings.getChunkSideLength();
-
 		for (Province province : new HashSet<>(TownyProvincesDataHolder.getInstance().getProvincesSet())) {
 			List<TPCoord> coordsInProvince = province.getListOfCoordsInProvince();
-			long numProvinceBlocksInSpecifiedArea = coordsInProvince.stream()
-				.filter(coord -> coord.getX() >= minX && coord.getX() <= maxX && coord.getZ() >= minZ && coord.getZ() <= maxZ)
-				.count();
+			int numProvinceBlocksInSpecifiedArea = 0;
+			for (TPCoord coordInProvince : coordsInProvince) {
+				if (coordInProvince.getX() < minX || coordInProvince.getX() > maxX || coordInProvince.getZ() < minZ || coordInProvince.getZ() > maxZ) {
+					continue;
+				}
+				numProvinceBlocksInSpecifiedArea++;
+			}
 			if (numProvinceBlocksInSpecifiedArea > (coordsInProvince.size() / 2)) {
 				TownyProvincesDataHolder.getInstance().deleteProvince(province, unclaimedCoordsMap);
 				numProvincesDeleted++;
 			}
 		}
-		TownyProvinces.info(numProvincesDeleted + " provinces deleted.");
+		TownyProvinces.info("" + numProvincesDeleted + " provinces deleted.");
 		return true;
 	}
 
@@ -117,13 +119,13 @@ public class PaintRegionAction {
 	 */
 	private boolean generateProvinces() {
 		TownyProvinces.info("Now generating province objects");
+		Province province;
 		int maxNumProvinces = calculateMaxNumberOfProvinces();
 		int maxNumRandomProvinces = maxNumProvinces - region.getProtectedLocations().size();
 		int provincesCreated = 0;
-
 		for (Map.Entry<String, Location> mapEntry : region.getProtectedLocations().entrySet()) {
 			TownyProvinces.info("Now generating province at protected location: " + mapEntry.getKey());
-			Province province = generateProtectedProvince(mapEntry.getValue());
+			province = generateProtectedProvince(mapEntry.getValue());
 			if (province == null) {
 				TownyProvinces.severe("Could not generate province at protected location: " + mapEntry.getKey());
 				return false;
@@ -132,9 +134,8 @@ public class PaintRegionAction {
 				provincesCreated++;
 			}
 		}
-
 		for (int randomProvinceIndex = 0; randomProvinceIndex < maxNumRandomProvinces; randomProvinceIndex++) {
-			Province province = generateRandomlyPlacedProvince();
+			province = generateRandomlyPlacedProvince();
 			if (province == null) {
 				break;
 			} else {
@@ -142,15 +143,15 @@ public class PaintRegionAction {
 				provincesCreated++;
 			}
 		}
-		TownyProvinces.info(provincesCreated + " province objects created.");
+		TownyProvinces.info("" + provincesCreated + " province objects created.");
 		return true;
 	}
 
 	private int calculateMaxNumberOfProvinces() {
 		double regionAreaSquareMetres = calculateRegionAreaSquareMetres();
-		int maxNumProvincesProvinces = (int) (regionAreaSquareMetres / region.getAverageProvinceSize());
-		TownyProvinces.info("Max num provinces: " + maxNumProvincesProvinces);
-		return maxNumProvincesProvinces;
+		int maxNumProvinces = (int) (regionAreaSquareMetres / region.getAverageProvinceSize());
+		TownyProvinces.info("Max num provinces: " + maxNumProvinces);
+		return maxNumProvinces;
 	}
 
 	private double calculateRegionAreaSquareMetres() {
@@ -189,14 +190,14 @@ public class PaintRegionAction {
 		double xHighest = region.getRegionMaxX() - region.getBrushSquareRadiusInChunks() - 3;
 		double zLowest = region.getRegionMinZ() + region.getBrushSquareRadiusInChunks() + 3;
 		double zHighest = region.getRegionMaxZ() - region.getBrushSquareRadiusInChunks() - 3;
-
 		for (int i = 0; i < 100; i++) {
 			double x = xLowest + (Math.random() * (xHighest - xLowest));
 			double z = zLowest + (Math.random() * (zHighest - zLowest));
 			Coord coord = Coord.parseCoord((int) x, (int) z);
-			TPCoord homeBlockCoord = new TPFinalCoord(coord.getX(), coord.getZ());
+			int xCoord = coord.getX();
+			int zCoord = coord.getZ();
+			TPCoord homeBlockCoord = new TPFinalCoord(xCoord, zCoord);
 			Province province = new Province(homeBlockCoord);
-
 			if (validateBrushPosition(homeBlockCoord.getX(), homeBlockCoord.getZ(), province)) {
 				ProvinceClaimBrush brush = new ProvinceClaimBrush(province);
 				claimChunksCoveredByBrush(brush);
@@ -220,6 +221,8 @@ public class PaintRegionAction {
 
 		int moveDeltaX;
 		int moveDeltaZ;
+		int newX;
+		int newZ;
 		for (int i = 0; i < region.getMaxBrushMoves(); i++) {
 			TownyProvinces.info("Painting Cycle: " + i + " / " + region.getMaxBrushMoves());
 			for (ProvinceClaimBrush provinceClaimBrush : provinceClaimBrushes) {
@@ -229,8 +232,8 @@ public class PaintRegionAction {
 				moveDeltaZ = TownyProvincesMathUtil.generateRandomInteger(-region.getMaxBrushMoveAmountInChunks(), region.getMaxBrushMoveAmountInChunks());
 				moveDeltaX = moveDeltaX > 0 ? Math.max(moveDeltaX, region.getMinBrushMoveAmountInChunks()) : Math.min(moveDeltaX, -region.getMinBrushMoveAmountInChunks());
 				moveDeltaZ = moveDeltaZ > 0 ? Math.max(moveDeltaZ, region.getMinBrushMoveAmountInChunks()) : Math.min(moveDeltaZ, -region.getMinBrushMoveAmountInChunks());
-				int newX = provinceClaimBrush.getCurrentPosition().getX() + moveDeltaX;
-				int newZ = provinceClaimBrush.getCurrentPosition().getZ() + moveDeltaZ;
+				newX = provinceClaimBrush.getCurrentPosition().getX() + moveDeltaX;
+				newZ = provinceClaimBrush.getCurrentPosition().getZ() + moveDeltaZ;
 
 				if (validateBrushPosition(newX, newZ, provinceClaimBrush.getProvince())) {
 					provinceClaimBrush.moveBrushTo(newX, newZ);
@@ -256,18 +259,16 @@ public class PaintRegionAction {
 	 * @return true if it's ok
 	 */
 	public boolean validateBrushPosition(int brushPositionCoordX, int brushPositionCoordZ, Province provinceBeingPainted) {
-		if (brushPositionCoordX < mapMinXCoord || brushPositionCoordX > mapMaxXCoord || brushPositionCoordZ < mapMinZCoord || brushPositionCoordZ > mapMaxZCoord) {
+		if (brushPositionCoordX < mapMinXCoord || brushPositionCoordX > mapMaxXCoord || brushPositionCoordZ < mapMinZCoord || brushPositionCoordZ > mapMaxZCoord)
 			return false;
-		}
-
 		int brushMinCoordX = brushPositionCoordX - region.getBrushSquareRadiusInChunks();
 		int brushMaxCoordX = brushPositionCoordX + region.getBrushSquareRadiusInChunks();
 		int brushMinCoordZ = brushPositionCoordZ - region.getBrushSquareRadiusInChunks();
 		int brushMaxCoordZ = brushPositionCoordZ + region.getBrushSquareRadiusInChunks();
-
-		for (int x = brushMinCoordX - 1; x <= brushMaxCoordX + 1; x++) {
-			for (int z = brushMinCoordZ - 1; z <= brushMaxCoordZ + 1; z++) {
-				Province province = TownyProvincesDataHolder.getInstance().getProvinceAtCoord(x, z);
+		Province province;
+		for (int x = brushMinCoordX - 1; x <= (brushMaxCoordX + 1); x++) {
+			for (int z = brushMinCoordZ - 1; z <= (brushMaxCoordZ + 1); z++) {
+				province = TownyProvincesDataHolder.getInstance().getProvinceAtCoord(x, z);
 				if (province != null && province != provinceBeingPainted) {
 					return false;
 				}
@@ -284,29 +285,22 @@ public class PaintRegionAction {
 	 * @param brush the brush
 	 */
 	private void claimChunksCoveredByBrush(ProvinceClaimBrush brush) {
-		if (!validateBrushPosition(brush.getCurrentPosition().getX(), brush.getCurrentPosition().getZ(), brush.getProvince())) {
+		if (!validateBrushPosition(brush.getCurrentPosition().getX(), brush.getCurrentPosition().getZ(), brush.getProvince()))
 			return;
-		}
 
 		int startX = brush.getCurrentPosition().getX() - region.getBrushSquareRadiusInChunks();
 		int endX = brush.getCurrentPosition().getX() + region.getBrushSquareRadiusInChunks();
 		int startZ = brush.getCurrentPosition().getZ() - region.getBrushSquareRadiusInChunks();
 		int endZ = brush.getCurrentPosition().getZ() + region.getBrushSquareRadiusInChunks();
-
-		Set<TPCoord> claimedCoords = new HashSet<>();
 		for (int x = startX; x <= endX; x++) {
 			for (int z = startZ; z <= endZ; z++) {
 				searchCoord.setValues(x, z);
 				if (unclaimedCoordsMap.containsKey(searchCoord)) {
-					claimedCoords.add(new TPFinalCoord(x, z));
+					TownyProvincesDataHolder.getInstance().claimCoordForProvince(unclaimedCoordsMap.get(searchCoord), brush.getProvince());
+					brush.registerChunkClaimed();
+					unclaimedCoordsMap.remove(searchCoord);
 				}
 			}
-		}
-
-		for (TPCoord coord : claimedCoords) {
-			TownyProvincesDataHolder.getInstance().claimCoordForProvince(coord, brush.getProvince());
-			brush.registerChunkClaimed();
-			unclaimedCoordsMap.remove(coord);
 		}
 	}
 
@@ -327,11 +321,9 @@ public class PaintRegionAction {
 			double totalClaimedChunks = totalChunksOnMap - unclaimedCoordsMap.size();
 			int percentageChunksClaimed = (int) ((totalClaimedChunks / totalChunksOnMap) * 100);
 			TownyProvinces.info("Assigning Unclaimed Chunks. Progress: " + percentageChunksClaimed + "%");
-
-			if (pendingCoordProvinceAssignments.isEmpty()) {
+			if (pendingCoordProvinceAssignments.size() == 0) {
 				break;
 			}
-
 			for (Map.Entry<TPCoord, Province> mapEntry : pendingCoordProvinceAssignments.entrySet()) {
 				if (verifyCoordEligibilityForProvinceAssignment(mapEntry.getKey())) {
 					TownyProvincesDataHolder.getInstance().claimCoordForProvince(mapEntry.getKey(), mapEntry.getValue());
@@ -358,7 +350,8 @@ public class PaintRegionAction {
 	}
 
 	private boolean verifyCoordEligibilityForProvinceAssignment(TPCoord coord) {
-		return getProvinceIfUnclaimedCoordIsEligibleForProvinceAssignment(coord) != null;
+		Province province = getProvinceIfUnclaimedCoordIsEligibleForProvinceAssignment(coord);
+		return province != null;
 	}
 
 	/**
@@ -370,15 +363,15 @@ public class PaintRegionAction {
 	 * @return the province to assign it to
 	 */
 	private Province getProvinceIfUnclaimedCoordIsEligibleForProvinceAssignment(TPCoord unclaimedCoord) {
-		if (unclaimedCoord.getX() < mapMinXCoord || unclaimedCoord.getX() > mapMaxXCoord || unclaimedCoord.getZ() < mapMinZCoord || unclaimedCoord.getZ() > mapMaxZCoord) {
+		if (unclaimedCoord.getX() < mapMinXCoord || unclaimedCoord.getX() > mapMaxXCoord || unclaimedCoord.getZ() < mapMinZCoord || unclaimedCoord.getZ() > mapMaxZCoord)
 			return null;
-		}
 
 		Province result = null;
+		Province province;
 		int[] x = new int[]{0, 0, 1, -1};
 		int[] z = new int[]{-1, 1, 0, 0};
 		for (int i = 0; i < 4; i++) {
-			Province province = TownyProvincesDataHolder.getInstance().getProvinceAtCoord(unclaimedCoord.getX() + x[i], unclaimedCoord.getZ() + z[i]);
+			province = TownyProvincesDataHolder.getInstance().getProvinceAtCoord(unclaimedCoord.getX() + x[i], unclaimedCoord.getZ() + z[i]);
 			if (province != null) {
 				if (result == null) {
 					result = province;
@@ -388,14 +381,13 @@ public class PaintRegionAction {
 			}
 		}
 
-		if (result == null) {
+		if (result == null)
 			return null;
-		}
 
 		x = new int[]{-1, 1, 1, -1};
 		z = new int[]{-1, -1, 1, 1};
 		for (int i = 0; i < 4; i++) {
-			Province province = TownyProvincesDataHolder.getInstance().getProvinceAtCoord(unclaimedCoord.getX() + x[i], unclaimedCoord.getZ() + z[i]);
+			province = TownyProvincesDataHolder.getInstance().getProvinceAtCoord(unclaimedCoord.getX() + x[i], unclaimedCoord.getZ() + z[i]);
 			if (province != null && province != result) {
 				return null;
 			}
@@ -411,11 +403,19 @@ public class PaintRegionAction {
 			Set<Province> provincesSet = TownyProvincesDataHolder.getInstance().getProvincesSet();
 			TownyProvinces.info("Total number of provinces: " + provincesSet.size());
 
+			int totalProvinces = provincesSet.size();
+			int processedProvinces = 0;
+			int lastLoggedPercentage = 0;
+
 			for (Province province : provincesSet) {
-				TownyProvinces.info("Checking province: " + province.getId());
 				if (province.getListOfCoordsInProvince().isEmpty()) {
 					provincesToDelete.add(province);
-					TownyProvinces.info("Marked for deletion: " + province.getId());
+				}
+				processedProvinces++;
+				int currentPercentage = (processedProvinces * 100) / totalProvinces;
+				if (currentPercentage >= lastLoggedPercentage + 10) {
+					TownyProvinces.info("Progress: " + currentPercentage + "%");
+					lastLoggedPercentage = currentPercentage;
 				}
 			}
 
@@ -427,15 +427,16 @@ public class PaintRegionAction {
 					TownyProvincesDataHolder.getInstance().deleteProvince(province, unclaimedCoordsMap);
 					TownyProvinces.info("Province Deleted: " + province.getId());
 				} catch (Exception e) {
-					TownyProvinces.severe("Error deleting Province: " + province.getId() + e);
+					TownyProvinces.info("Error deleting Province: " + province.getId() + e);
 				}
 			}
 
 			TownyProvinces.info("Empty Provinces Deleted.");
 		} catch (Exception e) {
-			TownyProvinces.severe("Error while deleting empty provinces" + e);
+			TownyProvinces.info("Error while deleting empty provinces" + e);
 		}
 
 		return true;
 	}
+
 }

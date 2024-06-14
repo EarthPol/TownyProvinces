@@ -27,25 +27,25 @@ import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.List;
 
-public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction{
+public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction {
 	private MarkerSet borderMarkerSet;
 	private MarkerSet homeBlocksMarkersSet;
 	private final TPFreeCoord tpFreeCoord;
-	
+
 	public DisplayProvincesOnBlueMapAction() {
 		TownyProvinces.info("Enabling BlueMap support.");
 
-		tpFreeCoord = new TPFreeCoord(0,0);
-		
+		tpFreeCoord = new TPFreeCoord(0, 0);
+
 		BlueMapAPI.onEnable(e -> {
 			addProvinceBordersMarkerSet();
 			addProvinceHomeBlocksMarkerSet();
 			reloadAction();
 		});
-		
+
 		TownyProvinces.info("BlueMap support enabled.");
-	  }
-	  
+	}
+
 	@Override
 	void reloadAction() {
 		BufferedImage configIcon = TownyProvincesSettings.getTownCostsIcon();
@@ -73,8 +73,7 @@ public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction
 			}
 		});
 	}
-	  
-	  
+
 	@Override
 	void executeAction(boolean bordersRefreshRequested, boolean homeBlocksRefreshRequested) {
 		BlueMapAPI.getInstance().ifPresent(api -> {
@@ -100,8 +99,7 @@ public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction
 			}
 			drawProvinceHomeBlocks();
 			drawProvinceBorders();
-			}
-		);
+		});
 	}
 
 	private void addProvinceHomeBlocksMarkerSet() {
@@ -131,19 +129,17 @@ public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction
 	protected void drawProvinceHomeBlocks() {
 		boolean biomeCostAdjustmentsEnabled = TownyProvincesSettings.isBiomeCostAdjustmentsEnabled();
 		Set<Province> provinceSet = new HashSet<>(TownyProvincesDataHolder.getInstance().getProvincesSet());
-		
-		for(Province province : provinceSet){
-			try{
+
+		for (Province province : provinceSet) {
+			try {
 				String iconUrl = "assets/province.png";
 				TPCoord homeBlock = province.getHomeBlock();
 				String homeBlockMarkerId = "province_homeblock_" + homeBlock.getX() + "-" + homeBlock.getZ();
 				Marker homeBlockMarker = homeBlocksMarkersSet.get(homeBlockMarkerId);
-				if(province.getType().canNewTownsBeCreated()){
-
-					if(homeBlockMarker != null) 
-						continue;
-					int realHomeBlockX = homeBlock.getX() * TownyProvincesSettings.getChunkSideLength();
-					int realHomeBlockZ = homeBlock.getZ() * TownyProvincesSettings.getChunkSideLength();
+				if (province.getType().canNewTownsBeCreated()) {
+					if (homeBlockMarker == null) {
+						int realHomeBlockX = homeBlock.getX() * TownyProvincesSettings.getChunkSideLength();
+						int realHomeBlockZ = homeBlock.getZ() * TownyProvincesSettings.getChunkSideLength();
 
 						String markerLabel;
 						if (TownyEconomyHandler.isActive()) {
@@ -164,16 +160,14 @@ public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction
 							.build();
 
 						homeBlocksMarkersSet.put(homeBlockMarkerId, homeBlockMarker);
-
-					}else{
-						
-						if(homeBlockMarker == null)
-							continue;
-						homeBlocksMarkersSet.remove(homeBlockMarkerId);
-						return;
 					}
-			}catch (Exception ex){
-				TownyProvinces.severe("Problem adding homeblock marker");
+				} else {
+					if (homeBlockMarker != null) {
+						homeBlocksMarkersSet.remove(homeBlockMarkerId);
+					}
+				}
+			} catch (Exception ex) {
+				TownyProvinces.severe("Problem adding homeblock marker for province ID: " + province.getId());
 				ex.printStackTrace();
 			}
 		}
@@ -181,19 +175,18 @@ public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction
 
 	@Override
 	protected void setProvinceMapStyles() {
-		Marker marker;
-		for(Province province : new HashSet<>(TownyProvincesDataHolder.getInstance().getProvincesSet())){
-			marker = borderMarkerSet.get(province.getId());
+		for (Province province : new HashSet<>(TownyProvincesDataHolder.getInstance().getProvincesSet())) {
+			Marker marker = borderMarkerSet.get(province.getId());
+
+			if (marker == null) {
+				TownyProvinces.severe("ERROR: Province marker for styling is null for province ID: " + province.getId());
+				continue;
+			}
 
 			int borderWeight = province.getType().getBorderWeight();
 			Color borderColor = new Color(province.getType().getBorderColour(), (float) province.getType().getBorderOpacity());
 			Color fillColor = new Color(province.getFillColour(), (float) province.getFillOpacity());
-			
-			if (marker == null) {
-				TownyProvinces.severe("ERROR: Province marker for styling is null");
-				continue;
-			}
-			
+
 			if (marker instanceof ShapeMarker) {
 				ShapeMarker shapeMarker = (ShapeMarker) marker;
 				shapeMarker.setLineColor(borderColor);
@@ -209,20 +202,20 @@ public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction
 		Color borderColor = new Color(province.getType().getBorderColour(), (float) province.getType().getBorderOpacity());
 		String markerId = province.getId();
 		Marker marker = borderMarkerSet.get(markerId);
-			if (marker == null) {
-				Set<TPCoord> borderCoords = findAllBorderCoords(province);
-				if (borderCoords.size() > 0) {
-					//Arrange border blocks into drawable line
-					List<TPCoord> drawableLineOfBorderCoords = arrangeBorderCoordsIntoDrawableLine(borderCoords);
-					
-					//Draw line
-					if (drawableLineOfBorderCoords.size() > 0) {
-						drawBorderLine(drawableLineOfBorderCoords, province, markerId);
-					} else {
-						TownyProvinces.severe("WARNING: Could not arrange province coords into drawable line. If this message has not stopped repeating a few minutes after your server starts, please report it to TownyAdvanced.");
-					}
+		if (marker == null) {
+			Set<TPCoord> borderCoords = findAllBorderCoords(province);
+			if (borderCoords.size() > 0) {
+				// Arrange border blocks into drawable line
+				List<TPCoord> drawableLineOfBorderCoords = arrangeBorderCoordsIntoDrawableLine(borderCoords);
+
+				// Draw line
+				if (drawableLineOfBorderCoords.size() > 0) {
+					drawBorderLine(drawableLineOfBorderCoords, province, markerId);
+				} else {
+					TownyProvinces.severe("WARNING: Could not arrange province coords into drawable line for province ID: " + province.getId());
 				}
 			}
+		}
 		if (marker instanceof ShapeMarker) {
 			ShapeMarker shapeMarker = (ShapeMarker) marker;
 			shapeMarker.setLineColor(borderColor);
@@ -235,12 +228,12 @@ public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction
 		Color borderColor = new Color(province.getType().getBorderColour(), (float) province.getType().getBorderOpacity());
 		Color fillColor = new Color(province.getFillColour(), (float) province.getFillOpacity());
 		List<Vector2d> points = new ArrayList<>();
-		for(TPCoord drawableLineOfBorderCoord : drawableLineOfBorderCoords){
+		for (TPCoord drawableLineOfBorderCoord : drawableLineOfBorderCoords) {
 			int x = (drawableLineOfBorderCoord.getX() * TownyProvincesSettings.getChunkSideLength());
 			int z = (drawableLineOfBorderCoord.getZ() * TownyProvincesSettings.getChunkSideLength());
-			
+
 			calculatePullStrengthFromNearbyProvince(drawableLineOfBorderCoord, province, tpFreeCoord);
-			
+
 			if (tpFreeCoord.getX() < 0) {
 				x += 7;
 			} else if (tpFreeCoord.getX() > 0) {
@@ -251,8 +244,8 @@ public class DisplayProvincesOnBlueMapAction extends DisplayProvincesOnMapAction
 			} else if (tpFreeCoord.getZ() > 0) {
 				z += 9;
 			}
-			
-			points.add(Vector2d.from(x,z));
+
+			points.add(Vector2d.from(x, z));
 		}
 		Shape shape = new Shape(points);
 		ShapeMarker marker = ShapeMarker.builder()

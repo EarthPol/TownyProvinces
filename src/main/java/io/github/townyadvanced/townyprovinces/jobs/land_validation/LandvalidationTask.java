@@ -12,49 +12,38 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class LandvalidationTask extends BukkitRunnable {
-	
+
 	@Override
 	public void run() {
 		TownyProvinces.info("Acquiring synch locks.");
 		synchronized (TownyProvinces.LAND_VALIDATION_JOB_LOCK) {
-			synchronized (TownyProvinces.REGION_REGENERATION_JOB_LOCK) {
-				synchronized (TownyProvinces.PRICE_RECALCULATION_JOB_LOCK) {
-					TownyProvinces.info("Synch locks acquired.");
-					/*
-					 * If there are no requests pending,
-					 * this is a fresh start, so request all provinces
-					 */
-					if (!areAnyValidationsPending()) {
-						setLandValidationRequestsForAllProvinces(true);
-					}
-					executeLandValidation();
-				}
+			TownyProvinces.info("Synch lock acquired.");
+
+			// If there are no requests pending, request all provinces
+			if (!areAnyValidationsPending()) {
+				setLandValidationRequestsForAllProvinces(true);
 			}
+
+			executeLandValidation();
 		}
 	}
 
 	private boolean areAnyValidationsPending() {
-		for(Province province: TownyProvincesDataHolder.getInstance().getProvincesSet()) {
-			if(province.isLandValidationRequested()) {
-				return true;
-			}
-		}
-		return false;
+		return TownyProvincesDataHolder.getInstance().getProvincesSet().stream()
+			.anyMatch(Province::isLandValidationRequested);
 	}
-	
+
 	private void setLandValidationRequestsForAllProvinces(boolean value) {
-		for(Province province: TownyProvincesDataHolder.getInstance().getProvincesSet()) {
-			if(province.isLandValidationRequested() != value) {
+		TownyProvincesDataHolder.getInstance().getProvincesSet().forEach(province -> {
+			if (province.isLandValidationRequested() != value) {
 				province.setLandValidationRequested(value);
 				province.saveData();
 			}
-		}
+		});
 	}
 	
 	/**
@@ -71,26 +60,28 @@ public class LandvalidationTask extends BukkitRunnable {
 	 */
 	private void executeLandValidation() {
 		TownyProvinces.info("Now Running land validation job.");
-		double numProvincesProcessed = 0;
-		Set<Province> copyOfProvincesSet = new HashSet<>(TownyProvincesDataHolder.getInstance().getProvincesSet());
-		for(Province province : copyOfProvincesSet) {
-			if(!province.isLandValidationRequested())
-				numProvincesProcessed++;  //Already processed
-		}
-		for(Province province: copyOfProvincesSet) {
+		Set<Province> provincesSet = new HashSet<>(TownyProvincesDataHolder.getInstance().getProvincesSet());
+		AtomicInteger numProvincesProcessed = new AtomicInteger();
+
+		provincesSet.forEach(province -> {
+			if (!province.isLandValidationRequested()) {
+				numProvincesProcessed.incrementAndGet();
+			}
+		});
+
+		provincesSet.forEach(province -> {
 			if (province.isLandValidationRequested()) {
 				doLandValidation(province);
-				numProvincesProcessed++;
+				numProvincesProcessed.incrementAndGet();
 			}
-			int percentCompletion = (int)((numProvincesProcessed / copyOfProvincesSet.size()) * 100);
+			int percentCompletion = (int) ((numProvincesProcessed.get() / (double) provincesSet.size()) * 100);
 			TownyProvinces.info("Land Validation Job Progress: " + percentCompletion + "%");
 
-			//Handle any stop requests
-			LandValidationJobStatus landValidationJobStatus = LandValidationTaskController.getLandValidationJobStatus();
-			switch (landValidationJobStatus) {
+			// Handle any stop requests
+			switch (LandValidationTaskController.getLandValidationJobStatus()) {
 				case STOP_REQUESTED:
 					TownyProvinces.info("Land Validation Task: Clearing all validation requests");
-					setLandValidationRequestsForAllProvinces(false);  //Clear all requests
+					setLandValidationRequestsForAllProvinces(false);
 					TownyProvinces.info("Land Validation Task: Stopping");
 					LandValidationTaskController.stopTask();
 					return;
@@ -100,18 +91,19 @@ public class LandvalidationTask extends BukkitRunnable {
 					return;
 				case RESTART_REQUESTED:
 					TownyProvinces.info("Land Validation Task: Clearing all validation requests");
-					setLandValidationRequestsForAllProvinces(false);  //Clear all requests
+					setLandValidationRequestsForAllProvinces(false);
 					TownyProvinces.info("Land Validation Task: Saving data");
 					LandValidationTaskController.restartTask();
 					return;
-			case PAUSED:
-			case STARTED:
-			case START_REQUESTED:
-			case STOPPED:
-			default:
-				break;
+				case PAUSED:
+				case STARTED:
+				case START_REQUESTED:
+				case STOPPED:
+				default:
+					break;
 			}
-		}
+		});
+
 		LandValidationTaskController.stopTask();
 		TownyProvinces.info("Land Validation Job Complete.");
 	}
@@ -125,55 +117,59 @@ public class LandvalidationTask extends BukkitRunnable {
 	private void doLandValidation(Province province) {
 		List<TPCoord> coordsInProvince = province.getListOfCoordsInProvince();
 		World world = Bukkit.getWorld(TownyProvincesSettings.getWorldName());
-		TPCoord coordToTest;
+		if (world == null) return;
+
 		double goodLand = 0;
 		double water = 0;
 		double hotLand = 0;
 		double coldLand = 0;
-		double totalChunksToScan = 20;
+		int totalChunksToScan = 20;
 
-		for(int i = 0; i < totalChunksToScan; i++) {
-			coordToTest = coordsInProvince.get((int) (Math.random() * coordsInProvince.size()));
+		Random random = new Random();
+
+		for (int i = 0; i < totalChunksToScan; i++) {
+			TPCoord coordToTest = coordsInProvince.get(random.nextInt(coordsInProvince.size()));
 			BiomeType biomeType = BiomeUtil.getBiomeType(world, coordToTest);
-			switch (Objects.requireNonNull(biomeType)) {
-				case GOOD_LAND:
-					goodLand++;
-					break;
-				case WATER:
-					water++;
-					break;
-				case HOT_LAND:
-					hotLand++;
-					break;
-				case COLD_LAND:
-					coldLand++;
-					break;
+			if (biomeType != null) {
+				switch (biomeType) {
+					case GOOD_LAND:
+						goodLand++;
+						break;
+					case WATER:
+						water++;
+						break;
+					case HOT_LAND:
+						hotLand++;
+						break;
+					case COLD_LAND:
+						coldLand++;
+						break;
+				}
 			}
 		}
-		
-		//Set type
-		if(water == totalChunksToScan) {
+
+		// Set type
+		if (water == totalChunksToScan) {
 			province.setType(ProvinceType.SEA);
 		} else if (goodLand == 0) {
 			province.setType(ProvinceType.WASTELAND);
 		} else {
 			province.setType(ProvinceType.CIVILIZED);
 		}
-			
-		//Set proportions
+
+		// Set proportions
 		province.setEstimatedProportionOfGoodLand(goodLand / totalChunksToScan);
 		province.setEstimatedProportionOfWater(water / totalChunksToScan);
 		province.setEstimatedProportionOfHotLand(hotLand / totalChunksToScan);
 		province.setEstimatedProportionOfColdLand(coldLand / totalChunksToScan);
 
-		//Mark as validated
+		// Mark as validated
 		province.setLandValidationRequested(false);
-		
-		//Save data
+
+		// Save data
 		province.saveData();
-		
-		//Request dynmap refresh of homeblocks 
-		// (no need to refresh border colour changes, the dynmap task will do that where needed)
+
+		// Request dynmap refresh of homeblocks
 		MapDisplayTaskController.requestHomeBlocksRefresh();
 	}
 }
